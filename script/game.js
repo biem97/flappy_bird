@@ -1,7 +1,5 @@
-/*eslint-env es6*/
-/*global require*/
-
 // JAVASCRIPT CODE //
+// TEST MODULE
 
 //DRAW CANVAS
 const cvs = document.getElementById("bird");
@@ -31,12 +29,40 @@ SWOOSHING_S.src = "audio/sfx_swooshing.wav";
 const DIE_S = new Audio();
 DIE_S.src = "audio/sfx_die.wav";
 
-//GAME STATE
+//GAME STATE && STATE CONTROL
 const state = {
     current: 0,
     getReady: 0,
     game: 1,
-    over: 2
+    over: 2,
+    stateControl: function (evt) {
+        switch (state.current) {
+            case state.getReady:
+                state.current = state.game;
+                SWOOSHING_S.play();
+                break;
+            case state.game:
+                bird.flap();
+                FLAP_S.play();
+                break;
+            case state.over:
+                let rect = cvs.getBoundingClientRect();
+                let clickX = evt.clientX - rect.left;
+                let clickY = evt.clientY - rect.top;
+    
+                //console.log(`clickX ${clickX} clickY ${clickY}`);
+                if (clickX >= startBtn.x &&
+                    clickX <= startBtn.x + startBtn.w &&
+                    clickY >= startBtn.y &&
+                    clickY <= startBtn.y + startBtn.h) {
+                    bird.speedReset();
+                    pipes.reset();
+                    score.reset();
+                    state.current = state.getReady;
+                }
+                break;
+        }
+    }
 }
 
 // START BUTTON CO-ORD
@@ -48,34 +74,13 @@ const startBtn = {
 }
 
 //CONTROL THE GAME
+// CLICK ON CANVAS EVENT
 cvs.addEventListener('click', (evt) => {
-    switch (state.current) {
-        case state.getReady:
-            state.current = state.game;
-            SWOOSHING_S.play();
-            break;
-        case state.game:
-            bird.flap();
-            FLAP_S.play();
-            break;
-        case state.over:
-            let rect = cvs.getBoundingClientRect();
-            let clickX = evt.clientX - rect.left;
-            let clickY = evt.clientY - rect.top;
-
-            console.log(`clickX ${clickX} clickY ${clickY}`);
-            if (clickX >= startBtn.x &&
-                clickX <= startBtn.x + startBtn.w &&
-                clickY >= startBtn.y &&
-                clickY <= startBtn.y + startBtn.h) {
-                    bird.speedReset();
-                    pipes.reset();
-                    score.reset();
-                    state.current = state.getReady;
-                    state.current = state.getReady; 
-            }
-            break;
-    }
+    state.stateControl(evt);
+})
+// PRESS ANY KEY ON KEYBOARD
+window.addEventListener('keydown', (evt) => {
+    state.stateControl(evt);
 })
 
 // BACKGROUND
@@ -164,6 +169,10 @@ const bird = {
 
     flap: function () {
         this.speed = -this.jump;
+        // IF BIRD FLY ABOVE THE CANVAS
+        if (this.y + this.radius <= 10) {
+            this.speed = this.gravity;
+        }
     },
 
     update: function () {
@@ -194,6 +203,7 @@ const bird = {
             // IF THE SPEED IS GREATER THAN THE JUMP MEANS THE BIRD IS FALLING DOWN
             if (this.speed >= this.jump) {
                 this.rotation = 90 * DEGREE;
+                this.frame = 1;
             } else {
                 this.rotation = -25 * DEGREE;
             }
@@ -233,6 +243,7 @@ const gameOver = {
     draw: function () {
         if (state.current == state.over) {
             ctx.drawImage(sprite, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
+
         }
     }
 }
@@ -300,8 +311,9 @@ const pipes = {
                 border.left < p.x + this.w &&
                 border.top > bird.y &&
                 border.bottom < p.y + this.h) {
+                HIT_S.play();
                 state.current = state.over;
-                DIE_S.play();
+
             }
 
             // BOTTOM PIPE
@@ -309,8 +321,8 @@ const pipes = {
                 border.left < p.x + this.w &&
                 border.top > bottomYPos &&
                 border.bottom < bottomYPos + this.h) {
+                HIT_S.play();
                 state.current = state.over;
-                DIE_S.play();
             }
 
             // MOVE THE PIPES TO THE LEFT
@@ -322,7 +334,7 @@ const pipes = {
 
                 //Increase the score
                 score.value += 1;
-                SCORE_S.play(); 
+                SCORE_S.play();
                 //Compare the best score with current score while playing
                 score.best = Math.max(score.best, score.value);
                 localStorage.setItem("best", score.best);
@@ -341,6 +353,34 @@ const pipes = {
 const score = {
     best: parseInt(localStorage.getItem("best")) || 0,
     value: 0,
+    //DRAW MEDAL FOR THE ROUND
+
+    medal: {
+        paper: {
+            x: 312,
+            y: 112,
+            w: 46,
+            h: 44
+        },
+        silver: {
+            x: 358,
+            y: 112,
+            w: 46,
+            h: 44
+        },
+        bronze: {
+            x: 358,
+            y: 156,
+            w: 46,
+            h: 44
+        },
+        gold: {
+            x: 312,
+            y: 156,
+            w: 46,
+            h: 44
+        }
+    },
 
     draw: function () {
         ctx.fillStyle = "#FFF";
@@ -357,12 +397,19 @@ const score = {
             ctx.strokeText(this.value, 225, 193);
             ctx.fillText(this.best, 225, 235);
             ctx.strokeText(this.best, 225, 235);
+
+            if (this.value >= 0 && this.value < 10) {
+                ctx.drawImage(sprite, this.medal.paper.x, this.medal.paper.y, this.medal.paper.w, this.medal.paper.h, 72, 186, this.medal.paper.w, this.medal.paper.h);
+            } else if (this.value < 20) {
+                ctx.drawImage(sprite, this.medal.bronze.x, this.medal.bronze.y, this.medal.bronze.w, this.medal.bronze.h, 72, 186, this.medal.bronze.w, this.medal.bronze.h);
+            } else if (this.value < 30) {
+                ctx.drawImage(sprite, this.medal.silver.x, this.medal.silver.y, this.medal.silver.w, this.medal.silver.h, 72, 186, this.medal.silver.w, this.medal.silver.h);
+            } else {
+                ctx.drawImage(sprite, this.medal.gold.x, this.medal.gold.y, this.medal.gold.w, this.medal.gold.h, 72, 186, this.medal.gold.w, this.medal.gold.h);
+            }
         }
     },
 
-    update: function () {
-
-    },
     // RESET FUNCTION
     reset: function () {
         this.value = 0;
