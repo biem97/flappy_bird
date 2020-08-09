@@ -15,6 +15,22 @@ const DEGREE = Math.PI / 180;
 const sprite = new Image();
 sprite.src = "img/sprite.png";
 
+// LOAD SOUNDS
+const SCORE_S = new Audio();
+SCORE_S.src = "audio/sfx_point.wav";
+
+const FLAP_S = new Audio();
+FLAP_S.src = "audio/sfx_flap.wav";
+
+const HIT_S = new Audio();
+HIT_S.src = "audio/sfx_hit.wav";
+
+const SWOOSHING_S = new Audio();
+SWOOSHING_S.src = "audio/sfx_swooshing.wav";
+
+const DIE_S = new Audio();
+DIE_S.src = "audio/sfx_die.wav";
+
 //GAME STATE
 const state = {
     current: 0,
@@ -26,7 +42,7 @@ const state = {
 // START BUTTON CO-ORD
 const startBtn = {
     x: 120,
-    y: 263,
+    y: 272,
     w: 83,
     h: 29
 }
@@ -36,12 +52,28 @@ cvs.addEventListener('click', (evt) => {
     switch (state.current) {
         case state.getReady:
             state.current = state.game;
+            SWOOSHING_S.play();
             break;
         case state.game:
             bird.flap();
+            FLAP_S.play();
             break;
         case state.over:
-            state.current = state.getReady;
+            let rect = cvs.getBoundingClientRect();
+            let clickX = evt.clientX - rect.left;
+            let clickY = evt.clientY - rect.top;
+
+            console.log(`clickX ${clickX} clickY ${clickY}`);
+            if (clickX >= startBtn.x &&
+                clickX <= startBtn.x + startBtn.w &&
+                clickY >= startBtn.y &&
+                clickY <= startBtn.y + startBtn.h) {
+                    bird.speedReset();
+                    pipes.reset();
+                    score.reset();
+                    state.current = state.getReady;
+                    state.current = state.getReady; 
+            }
             break;
     }
 })
@@ -150,10 +182,12 @@ const bird = {
             this.speed += this.gravity;
             this.y += this.speed;
 
+            // DIE IF HIT THE GROUND
             if (this.y + this.h / 2 >= cvs.height - fg.h) {
                 this.y = cvs.height - fg.h - this.h / 2;
                 if (state.current == state.game) {
                     state.current = state.over;
+                    DIE_S.play();
                 }
             }
 
@@ -164,6 +198,10 @@ const bird = {
                 this.rotation = -25 * DEGREE;
             }
         }
+    },
+    // RESET FUNCTION
+    speedReset: function () {
+        this.speed = 0;
     }
 
 }
@@ -255,13 +293,15 @@ const pipes = {
                 top: bird.y + bird.radius,
                 bottom: bird.y - bird.radius
             }
-            // TOP PIPE
 
+            // DIE IF HIT THE PIPES
+            // TOP PIPE
             if (border.right > p.x &&
                 border.left < p.x + this.w &&
                 border.top > bird.y &&
                 border.bottom < p.y + this.h) {
                 state.current = state.over;
+                DIE_S.play();
             }
 
             // BOTTOM PIPE
@@ -270,6 +310,7 @@ const pipes = {
                 border.top > bottomYPos &&
                 border.bottom < bottomYPos + this.h) {
                 state.current = state.over;
+                DIE_S.play();
             }
 
             // MOVE THE PIPES TO THE LEFT
@@ -278,9 +319,21 @@ const pipes = {
             // REMOVE THE PIPE WHICH IS OUT OF CANVAS
             if (p.x + this.w <= 0) {
                 this.position.shift();
+
+                //Increase the score
+                score.value += 1;
+                SCORE_S.play(); 
+                //Compare the best score with current score while playing
+                score.best = Math.max(score.best, score.value);
+                localStorage.setItem("best", score.best);
             }
         }
+    },
+    // RESET FUNCTION
+    reset: function () {
+        this.position = [];
     }
+
 
 }
 
@@ -290,8 +343,31 @@ const score = {
     value: 0,
 
     draw: function () {
+        ctx.fillStyle = "#FFF";
+        ctx.strokeStyle = "#000";
 
+        if (state.current == state.game) {
+            ctx.lineWidth = 2;
+            ctx.font = "35px Teko";
+            ctx.fillText(this.value, cvs.width / 2, 50);
+            ctx.strokeText(this.value, cvs.width, 50);
+        } else if (state.current == state.over) {
+            ctx.font = "25px Teko";
+            ctx.fillText(this.value, 225, 193);
+            ctx.strokeText(this.value, 225, 193);
+            ctx.fillText(this.best, 225, 235);
+            ctx.strokeText(this.best, 225, 235);
+        }
+    },
+
+    update: function () {
+
+    },
+    // RESET FUNCTION
+    reset: function () {
+        this.value = 0;
     }
+
 }
 
 // DRAW
@@ -306,6 +382,7 @@ function draw() {
     bird.draw();
     getReady.draw();
     gameOver.draw();
+    score.draw();
 }
 
 // UPDATE FUNCTION
